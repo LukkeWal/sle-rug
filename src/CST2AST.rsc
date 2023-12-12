@@ -66,7 +66,7 @@ default AType cst2ast(Type t) {
 }
 
 AId cst2ast(Id i){
-  return id("<i>");
+  return id("<i>", src=i.src);
 }
 
 void testImplementation(){
