@@ -28,15 +28,19 @@ syntax Question
 syntax Expr 
     = Id \ "true" \ "false" // true/false are reserved keywords.
     | left Computation: Expr a Operator operator Expr b
-    | StrValue: Str value
-    | IntValue: Int value
-    | BoolValue: Bool value
+    | val: Value v
     ;
 
 syntax Type 
     = String: "string"
     | Boolean: "boolean"
     | Integer: "integer"
+    ;
+
+syntax Value
+    = string: Str
+    | integer: Int
+    | boolean: Bool
     ;
 
 lexical Str 
