@@ -16,7 +16,7 @@ start syntax Form
 // TODO: question, computed question, block, if-then-else, if-then
 syntax Question 
     = singleQuestion: Str label Id id ":" Type finaltype
-    | computedQuestion: Str label Id id ":" Type finaltype "=" "("Expr expression")"
+    | computedQuestion: Str label Id id ":" Type finaltype "=" Expr expression
     | block: "{"Question* questions"}"
     | ifElseQuestion: "if (" Id conditionId ")" Question+ ifQuestions "else" Question+ elseQuestions
     | ifQuestion: "if (" Id ifId ")" Question+ ifQuestions
@@ -71,11 +71,12 @@ lexical Operator
     > "!"
     ;
 
-map[str, value] syntax2map(start[Form] form) = syntax2map(form.top);
-map[str, value] syntax2map(Form form) = ("<form.name>": syntax2map(form.questions));
+map[str, value] syntax2map(start[Form] form) {println("here with start form:\n<form>"); return syntax2map(form.top);}
+map[str, value] syntax2map(Form form) {println("here with form:\n<form>"); return ("<form.name>": syntax2map(form.questions));}
 map[str, value] syntax2map(Question* questions){
     map[str, value] result = ();
     for (question <- questions){
+        println("here with question:\n<question>");
         switch(question){
             case singleQuestion(_, _, _): result["singleQuestion <question.id> returns <question.finaltype>"] = "<question.label>";
             case computedQuestion(_, _, _, _): result["computedQuestion <question.id>  returns <question.finaltype>"] = "<question.label> = <question.expression>";
@@ -92,26 +93,11 @@ default map[str, value] syntax2map(value v){
     return ();
 }
 
-start[Form] example()
-    = parse(#start[Form],
-        "form taxOfficeExample { 
-        '   \"Did you sell a house in 2010?\"
-        '       hasSoldHouse: boolean
-        '   \"Did you buy a house in 2010?\"
-        '       hasBoughtHouse: boolean
-        '   \"Did you enter a loan?\"
-        '       hasMaintLoan: boolean
-            
-        '   if (hasSoldHouse) {
-        '   \"What was the selling price?\"
-        '       sellingPrice: integer
-        '   \"Private debts for the sold house:\"
-        '       privateDebt: integer
-        '   \"Value residue:\"
-        '   valueResidue: integer = 
-        '       (sellingPrice - privateDebt)
-        '    }
-        '}");
+start[Form] example() {
+    loc fileLocation = |cwd:///examples/tax.myql|;
+    str content = readFile(resolveLocation(fileLocation));
+    return parse(#start[Form], content);
+}        
 
 
 void testSyntax() {
