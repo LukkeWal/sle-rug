@@ -71,12 +71,11 @@ lexical Operator
     > "!"
     ;
 
-map[str, value] syntax2map(start[Form] form) {println("here with start form:\n<form>"); return syntax2map(form.top);}
-map[str, value] syntax2map(Form form) {println("here with form:\n<form>"); return ("<form.name>": syntax2map(form.questions));}
+map[str, value] syntax2map(start[Form] form) = syntax2map(form.top);
+map[str, value] syntax2map(Form form) = ("<form.name>": syntax2map(form.questions));
 map[str, value] syntax2map(Question* questions){
     map[str, value] result = ();
     for (question <- questions){
-        println("here with question:\n<question>");
         switch(question){
             case singleQuestion(_, _, _): result["singleQuestion <question.id> returns <question.finaltype>"] = "<question.label>";
             case computedQuestion(_, _, _, _): result["computedQuestion <question.id>  returns <question.finaltype>"] = "<question.label> = <question.expression>";
@@ -95,13 +94,14 @@ default map[str, value] syntax2map(value v){
 
 start[Form] example() {
     loc fileLocation = |cwd:///examples/tax.myql|;
-    str content = readFile(resolveLocation(fileLocation));
-    return parse(#start[Form], content);
+    return parse(#start[Form], resolveLocation(fileLocation));
 }        
 
 
 void testSyntax() {
     value form = example();
+    start[Form] f = example();
+    println("source: <f.src>");
     println("Successfully parsed:\n<form>");
     println("Map of form:\n<syntax2map(form)>");
 }
