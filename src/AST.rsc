@@ -17,11 +17,13 @@ data AQuestion(loc src = |tmp:///|)
   | block(list[AQuestion] questions)
   | ifElseQuestion(AId conditionId, list[AQuestion] ifQuestions, list[AQuestion] elseQuestions)
   | ifQuestion(AId ifId, list[AQuestion] ifQuestions)
+  | ifExprQuestion(AExpr e, AQuestion singleQ)
   ; 
 
 data AExpr(loc src = |tmp:///|)
   = ref(AId id)
   | computationExpr(AExpr a, str operator, AExpr b)
+  | negatedExpr(ANeg neg, AExpr a)
   | val(AValue v)
   ;
 
@@ -54,5 +56,8 @@ data AValue(loc src = |tmp:///|)
     | eq()
     | greater()
     | less()
-    | not()
     ;
+
+data ANeg
+  = not()
+  ;
