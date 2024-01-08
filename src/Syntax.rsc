@@ -92,6 +92,11 @@ default map[str, value] syntax2map(value v){
     return ();
 }
 
+start[Form] parseFromFile(loc fileLocation){
+    println("HERE!");
+    return parse(#start[Form], resolveLocation(fileLocation));
+}
+
 start[Form] example() {
     loc fileLocation = |cwd:///examples/tax.myql|;
     return parse(#start[Form], resolveLocation(fileLocation));

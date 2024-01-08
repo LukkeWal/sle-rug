@@ -94,8 +94,31 @@ void testFlatten(){
  */
  
 start[Form] rename(start[Form] f, loc useOrDef, str newName, UseDef useDef) {
-   return f; 
+  loc definition;
+  for(ud <- useDef){
+    if (ud.use == useOrDef || ud.def == useOrDef){
+      definition = ud.def;
+      break;
+    }
+    throw "no definition found for <useOrDef>";
+  }
+  for (use <- {x.use | x <- useDef && x.def == definition}){
+    writeFile(use, newName);
+  }
+  writeFile(definition, newName);
+  // I tried using the useOrDef path to re-parse instead of example(), but I could not find a way to 
+  // use the string given by useOrDef.path and turn it into a location to be used by readFile().
+  // All examples in the documentation use direclty typed strings, no variables.
+  return example();
 } 
+
+void testRename(){
+  start[Form] f = example();
+  AForm Af = cst2ast(f);
+  RefGraph r = resolve(Af);
+  AQuestion q = Af.questions[2];
+  rename(f, q.id.src, "myNewName", r.useDef);
+}
  
  
  
