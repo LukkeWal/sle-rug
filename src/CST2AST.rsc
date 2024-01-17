@@ -4,6 +4,8 @@ import Syntax;
 import AST;
 
 import ParseTree;
+import String;
+import Boolean;
 
 /*
  * Implement a mapping from concrete syntax trees (CSTs) to abstract syntax trees (ASTs)
@@ -29,10 +31,10 @@ default AQuestion cst2ast(Question q) {
       return computedQuestion("<label>", cst2ast(id), cst2ast(finaltype), cst2ast(expression), src=q.src);
     case block(questions):
       return block([cst2ast(x) | x <- questions], src=q.src);
-    case ifQuestion(conditionId, ifQuestions):
-      return ifQuestion(cst2ast(conditionId), [cst2ast(x) | x <- ifQuestions], src=q.src);
-    case ifElseQuestion(conditionId, ifQuestions, elseQuestions): 
-      return ifElseQuestion(cst2ast(conditionId), [cst2ast(x) | x <- ifQuestions], [cst2ast(x) | x <- elseQuestions], src=q.src);
+    case ifQuestion(guard, question):
+      return ifQuestion(cst2ast(guard), cst2ast(question), src=q.src);
+    case ifElseQuestion(Expr guard, Question ifQuestion, Question elseQuestion): 
+      return ifElseQuestion(cst2ast(guard), cst2ast(ifQuestion), cst2ast(elseQuestion), src=q.src);
     default: throw "Unhandled question: <q>";
   }
 }
@@ -40,17 +42,19 @@ default AQuestion cst2ast(Question q) {
 AExpr cst2ast(Expr e) {
   switch (e) {
     case (Expr)`<Id x>`: return ref(id("<x>", src=x.src), src=x.src);
-    case Computation(a, operator, b): return computationExpr(cst2ast(a), "<operator>", cst2ast(b), src=e.src);
-    case val(v): return cst2ast(v, src=e.src);
+    case computation(Expr a, Operator operator, Expr b): return computation(cst2ast(a), "<operator>", cst2ast(b), src=e.src);
+    case negation(Negator negator, Expr e): return negation("<negator>", cst2ast(e), src=e.src);
+    case val(Value v): return val(cst2ast(v), src=e.src);
+    case parenthesis(Expr a): return parenthesis(cst2ast(a), src=e.src);
     default: throw "Unhandled expression: <e>";
   }
 }
 
 AValue cst2ast(Value v){
   switch(v){
-    case string(): return String(src=v.src);
-    case integer(): return Boolean(src=v.src);
-    case boolean(): return Integer(src=v.src);
+    case string(Str s): return String("<s>", src=v.src);
+    case integer(Int i): return Integer(toInt("<i>"), src=v.src);
+    case boolean(Bool b): return Boolean(fromString("<b>"), src=v.src);
     default: throw "Unhandled value: <v>";
   }
 }
@@ -80,4 +84,62 @@ void testImplementation(){
   println("result:\n<result>");
 }
 
+test bool testBinary(){
+    try{
+        cst2ast(getForm(1));
+        println("PASSED: CST2AST with binary.myql");
+    }
+    catch ParseError(location):{
+        println("FAILED: CST2AST with binary.myql\nlocation: <location>");
+        return false;
+    }
+    return true;
+}
 
+test bool testCyclic(){
+    try{
+        cst2ast(getForm(2));
+        println("PASSED: CST2AST with cyclic.myql");
+    }
+    catch ParseError(location): {
+        println("FAILED: CST2AST with cyclic.myql\nlocation: <location>");
+        return false;
+    }
+    return true;
+}
+
+test bool testEmpty(){
+    try{
+        cst2ast(getForm(3));
+        println("PASSED: CST2AST with empty.myql");
+    }
+    catch ParseError(location):{
+        println("FAILED: CST2AST with empty.myql\nlocation: <location>");
+        return false;
+    }
+    return true;
+}
+
+test bool testErrors(){
+    try{
+        cst2ast(getForm(4));
+        println("PASSED: CST2AST with errors.myql");
+    }
+    catch ParseError(location): {
+        println("FAILED: CST2AST with errors.myql\nlocation: <location>");
+        return false;
+    }
+    return true;
+}
+
+test bool testTax(){
+     try{
+        cst2ast(getForm(5));
+        println("PASSED: CST2AST with tax.myql");
+    }
+    catch ParseError(location):{
+        println("FAILED: CST2AST with tax.myql\nlocation: <location>");
+        return false;
+    }
+    return true;
+}

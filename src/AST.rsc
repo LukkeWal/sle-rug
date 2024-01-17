@@ -15,16 +15,16 @@ data AQuestion(loc src = |tmp:///|)
   = singleQuestion(str label, AId id, AType finaltype)
   | computedQuestion(str label, AId id, AType finaltype, AExpr expression)
   | block(list[AQuestion] questions)
-  | ifElseQuestion(AId conditionId, list[AQuestion] ifQuestions, list[AQuestion] elseQuestions)
-  | ifQuestion(AId ifId, list[AQuestion] ifQuestions)
-  | ifExprQuestion(AExpr e, AQuestion singleQ)
+  | ifElseQuestion(AExpr guard, AQuestion ifQuestion, AQuestion elseQuestion)
+  | ifQuestion(AExpr guard, AQuestion question)
   ; 
 
 data AExpr(loc src = |tmp:///|)
   = ref(AId id)
-  | computationExpr(AExpr a, str operator, AExpr b)
-  | negatedExpr(ANeg neg, AExpr a)
+  | computation(AExpr a, str operator, AExpr b)
+  | negation(str neg, AExpr a)
   | val(AValue v)
+  | parenthesis(AExpr a)
   ;
 
 
@@ -38,26 +38,7 @@ data AType(loc src = |tmp:///|)
   ;
 
 data AValue(loc src = |tmp:///|)
- = String()
- | Boolean()
- | Integer()
+ = String(str v)
+ | Boolean(bool b)
+ | Integer(int i)
  ;
-
- data AOperator
-    = mul() 
-    | div() 
-    | add() 
-    | sub()
-    | and() 
-    | or()
-    | neq()
-    | leq()
-    | geq()
-    | eq()
-    | greater()
-    | less()
-    ;
-
-data ANeg
-  = not()
-  ;
