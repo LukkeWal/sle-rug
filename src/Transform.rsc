@@ -5,6 +5,7 @@ import Syntax;
 import Resolve;
 import AST;
 import CST2AST;
+import Set;
 
 /* 
  * Transforming QL forms
@@ -33,7 +34,7 @@ import CST2AST;
 AForm flatten(AForm f) {
   list[AQuestion] flattenedQuestions = [];
   for(q <- f.questions){
-    flattenedQuestions += flatten(q, val(Boolean()));
+    flattenedQuestions += flatten(q, val(Boolean(true)));
   }
   f.questions = flattenedQuestions;
   return f; 
@@ -41,49 +42,42 @@ AForm flatten(AForm f) {
 
 list[AQuestion] flatten(AQuestion q, AExpr condition){
   switch(q){
-    case singleQuestion(_, _, _): return [(ifExprQuestion(condition, q))];
-    case computedQuestion(_, _, _, _): return [ifExprQuestion(condition, q)];
+    case singleQuestion(_, _, _): return [(ifQuestion(condition, q))];
+    case computedQuestion(_, _, _, _): return [ifQuestion(condition, q)];
     case block(questions): {
       list[AQuestion] result = [];
       for (question <- questions){
-        result += [ifExprQuestion(condition, question)];
+        result += flatten(question, condition);
       }
       return result;
     }
-    case ifElseQuestion(AId conditionId, ifQuestions, elseQuestions): {
+    case ifElseQuestion(AExpr guard, ifQuestion, elseQuestion): {
       list[AQuestion] result = [];
-      for(question <- ifQuestions){
-        result += flatten(question, addCondition(true, ref(conditionId), condition));
-      }
-      for(question <- elseQuestions) {
-        result += flatten(question, addCondition(false, ref(conditionId), condition));
-      }
+      result += flatten(ifQuestion, addCondition(true, guard, condition));
+      result += flatten(elseQuestion, addCondition(false, guard, condition));
       return result;
     }
-    case ifQuestion(AId conditionId, ifQuestions): {
-      list[AQuestion] result = [];
-      for(question <- ifQuestions){
-        result += flatten(question, addCondition(true, ref(conditionId), condition));
-      }
-      return result;
-    }
+    case ifQuestion(AExpr guard, ifQuestion): return flatten(ifQuestion, addCondition(true, guard, condition));
     default: throw "unimplemented question <q>";
   }
 }
 
 AExpr addCondition(bool mustBeTrue, AExpr exprToAdd, AExpr currentExpression){
   if (!mustBeTrue){
-    exprToAdd = negatedExpr(not(), exprToAdd);
+    exprToAdd = negation("!", exprToAdd);
   }
-  return computationExpr(currentExpression, "&&", exprToAdd);
+  return computation(currentExpression, "&&", exprToAdd);
 }
 
-void testFlatten(){
-  AForm f = getExampleAST();
-  f = flatten(f);
-  for(q <- f.questions){
-      println("if(<q.e>): <q.singleQ.label>");
+test bool testFlattenTax(){
+  AForm f = getAST(5);
+  AForm result = flatten(f);
+  for(q <- result.questions){
+    if (!(q is ifQuestion)){
+      return false;
+    }
   }
+  return true;
 }
 
 /* Rename refactoring:
@@ -109,15 +103,27 @@ start[Form] rename(start[Form] f, loc useOrDef, str newName, UseDef useDef) {
   // I tried using the useOrDef path to re-parse instead of example(), but I could not find a way to 
   // use the string given by useOrDef.path and turn it into a location to be used by readFile().
   // All examples in the documentation use direclty typed strings, no variables.
-  return example();
-} 
+  loc fileLocation = |file:///| + "<useOrDef.path>";
+  return getForm(fileLocation);
+}
 
-void testRename(){
-  start[Form] f = example();
-  AForm Af = cst2ast(f);
-  RefGraph r = resolve(Af);
-  AQuestion q = Af.questions[2];
-  rename(f, q.id.src, "myNewName", r.useDef);
+test bool testRenameTax(){
+  start[Form] f = getForm(5);
+  RefGraph r = resolve(cst2ast(f));
+  start[Form] result;
+  if(r.defs["hasSoldHouse"] == {}){
+    return false;
+  }
+  for(def <- r.defs["hasSoldHouse"]){
+    result = rename(f, def, "NewName", r.useDef);
+    break;
+  }
+  AForm Aresult = cst2ast(result);
+  RefGraph rResult = resolve(Aresult);
+  if(rResult.defs["hasSoldHouse"] == {}){
+    return true;
+  }
+  return false;
 }
  
  

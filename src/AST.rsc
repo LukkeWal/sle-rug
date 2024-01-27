@@ -21,8 +21,8 @@ data AQuestion(loc src = |tmp:///|)
 
 data AExpr(loc src = |tmp:///|)
   = ref(AId id)
-  | computation(AExpr a, str operator, AExpr b)
   | negation(str neg, AExpr a)
+  | computation(AExpr a, str operator, AExpr b)
   | val(AValue v)
   | parenthesis(AExpr a)
   ;

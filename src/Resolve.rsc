@@ -31,49 +31,33 @@ RefGraph resolve(AForm f) = <us, ds, us o ds>
 Use uses(AForm f) {
   Use result = {};
   for (question <- f.questions){
-    result = result + questionUses(question);
+    result += uses(question);
   }
   return result;
 }
 
-Use questionUses(AQuestion q) {
+Use uses(AQuestion q) {
   Use result = {};
   switch(q){
-    case computedQuestion(_, _, _, expression):
-      result = result + expressionUses(expression);
+    case computedQuestion(_, _, _, AExpr expression): result += uses(expression);
     case block(questions): {
-      for (question <- questions) {
-        result = result + questionUses(question);
+      for (question <- questions){
+        result += uses(question);
       }
     }
-    case ifQuestion(conditionId, ifQuestions):{
-      result = result + <conditionId.src, "<conditionId.name>">;
-      for (question <- ifQuestions) {
-        result = result + questionUses(question);
-      }
-    }
-    case ifElseQuestion(conditionId, ifQuestions, elseQuestions):{
-      result = result + <conditionId.src, "<conditionId.name>">;
-      for (question <- ifQuestions) {
-        result = result + questionUses(question);
-      }
-      for (question <- elseQuestions) {
-        result = result + questionUses(question);
-      }
-    }
+    case ifQuestion(AExpr guard, ifQuestion): result += uses(guard) + uses(ifQuestion);
+    case ifElseQuestion(AExpr guard, ifQuestion, elseQuestion): result += uses(guard) + uses(ifQuestion) + uses(elseQuestion);
   }
   return result;
 }
 
-Use expressionUses(AExpr e) {
+Use uses(AExpr e) {
   Use result = {};
   switch (e) {
-    case ref(x):
-      result = result + <x.src, "<x.name>">;
-    case computationExpr(a, _, b): {
-      result = result + expressionUses(a);
-      result = result + expressionUses(b);
-    }
+    case ref(x): result += <x.src, "<x.name>">;
+    case negation(_, AExpr a): result += uses(a);
+    case computation( AExpr a, _, AExpr b): result += uses(a) + uses(b);
+    case parenthesis(AExpr a): result += uses(a);
   }
   return result;
 }
@@ -81,46 +65,54 @@ Use expressionUses(AExpr e) {
 Def defs(AForm f) {
   Def result = {};
   for (question <- f.questions){
-    result = result + questionDefs(question);
+    result += defs(question);
   }
   return result;
 }
 
-Def questionDefs(AQuestion q){
+Def defs(AQuestion q){
   Def result = {};
   switch(q){
-    case singleQuestion(_,id,_):
-      result = result + <"<id.name>", id.src>;
-    case computedQuestion(_, id, _, _):
-      result = result + <"<id.name>", id.src>;
+    case singleQuestion(_,id,_): result += <"<id.name>", id.src>;
+    case computedQuestion(_, AId id, _, _): result += <"<id.name>", id.src>;
     case block(questions): {
-      for (question <- questions) {
-        result = result + questionDefs(question);
+      for (question <- questions){
+        result += defs(question);
       }
     }
-    case ifQuestion(_, ifQuestions):{
-      for (question <- ifQuestions) {
-        result = result + questionDefs(question);
-      }
-    }
-    case ifElseQuestion(_, ifQuestions, elseQuestions): {
-      for (question <- ifQuestions) {
-        result = result + questionDefs(question);
-      }
-      for (question <- elseQuestions) {
-        result = result + questionDefs(question);
-      }
-    }
+    case ifQuestion(_, AQuestion ifQuestion): result += defs(ifQuestion);
+    case ifElseQuestion(_, AQuestion ifQuestion, AQuestion elseQuestion): result += defs(ifQuestion) + defs(elseQuestion);
   }
   return result;
 }
 
-void testResolve(){
-  start[Form] exampleForm = example();
-  AForm AexampleForm = cst2ast(exampleForm);
-  println("from:\n<exampleForm>");
-  println("Afrom:\n<AexampleForm>");
-  println("uses:\n<uses(AexampleForm)>");
-  println("defs:\n<defs(AexampleForm)>");
-  println("refGraph:\n<resolve(AexampleForm)>");
+bool checkRefGraph(RefGraph r, list[str] correctUse, list[str] correctDef){
+  for(use <- r.uses){
+    if(!(use.name in correctUse)){
+      return false;
+    }
+  }
+  for(def <- r.defs){
+    if(!(def.name in correctDef)){
+      return false;
+    }
+  }
+  return true;
+}
+
+
+test bool testError(){
+  AForm f = getAST(4);
+  RefGraph r = resolve(f);
+  list[str] correctUses = ["hasSodHouse", "sellingPrice", "privateDebt"];
+  list[str] correctDefs = ["hasBoughtHouse", "hasMaintLoan", "hasSoldHouse", "sellingPrice", "privateDebt", "valueResidue"];
+  return checkRefGraph(r, correctUses, correctDefs);
+}
+
+test bool testTax(){
+  AForm f = getAST(5);
+  RefGraph r = resolve(f);
+  list[str] correctUses = ["hasSoldHouse", "sellingPrice", "privateDebt"];
+  list[str] correctDefs = ["hasBoughtHouse", "hasMaintLoan", "hasSoldHouse", "sellingPrice", "privateDebt", "valueResidue"];
+  return checkRefGraph(r, correctUses, correctDefs);
 }

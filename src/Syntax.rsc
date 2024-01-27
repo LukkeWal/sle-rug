@@ -2,6 +2,7 @@ module Syntax
 
 import IO;
 import ParseTree;
+import Exception;
 
 extend lang::std::Layout;
 extend lang::std::Id;
@@ -28,7 +29,7 @@ syntax Question
 syntax Expr 
     = Id \ "true" \ "false" // true/false are reserved keywords.
     | negation: Negator negator Expr e
-    | left computation: Expr a Operator operator Expr b
+    > left computation: Expr a Operator operator Expr b
     | val: Value v
     | parenthesis: "(" Expr a ")"
     ;
@@ -81,17 +82,13 @@ lexical Negator
 start[Form] parseFromFile(loc fileLocation){
     println("HERE!");
     return parse(#start[Form], resolveLocation(fileLocation));
+} 
+
+start[Form] parseFromString(str input){
+    return parse(#start[Form], input);
 }
 
-start[Form] example() {
-    loc fileLocation = |cwd:///examples/errors.myql|;
-    return parse(#start[Form], resolveLocation(fileLocation));
-}        
-
 start[Form] getForm(int number){
-    if(number < 1 || number > 5){
-        throw "<number> out of range.\n1: binary.myql\n2: cyclic.myql\n3: empty.myql\n4: errors.myql\n5: tax.myql";
-    }
     loc fileLocation;
     switch(number){
         case 1: fileLocation = |cwd:///examples/binary.myql|;
@@ -99,17 +96,20 @@ start[Form] getForm(int number){
         case 3: fileLocation = |cwd:///examples/empty.myql|;
         case 4: fileLocation = |cwd:///examples/errors.myql|;
         case 5: fileLocation = |cwd:///examples/tax.myql|;
+        default: throw "<number> out of range.\n1: binary.myql\n2: cyclic.myql\n3: empty.myql\n4: errors.myql\n5: tax.myql";
     }
+    return parse(#start[Form], resolveLocation(fileLocation));
+}
+
+start[Form] getForm(loc fileLocation){
     return parse(#start[Form], resolveLocation(fileLocation));
 }
 
 test bool testBinary(){
     try{
         getForm(1);
-        println("PASSED: Syntax with binary.myql");
     }
     catch ParseError(location):{
-        println("FAILED: Syntax with binary.myql\nlocation: <location>");
         return false;
     }
     return true;
@@ -118,10 +118,8 @@ test bool testBinary(){
 test bool testCyclic(){
     try{
         getForm(2);
-        println("PASSED: Syntax with cyclic.myql");
     }
     catch ParseError(location): {
-        println("FAILED: Syntax with cyclic.myql\nlocation: <location>");
         return false;
     }
     return true;
@@ -130,10 +128,8 @@ test bool testCyclic(){
 test bool testEmpty(){
     try{
         getForm(3);
-        println("PASSED: Syntax with empty.myql");
     }
     catch ParseError(location):{
-        println("FAILED: Syntax with empty.myql\nlocation: <location>");
         return false;
     }
     return true;
@@ -142,10 +138,8 @@ test bool testEmpty(){
 test bool testErrors(){
     try{
         getForm(4);
-        println("PASSED: Syntax with errors.myql");
     }
     catch ParseError(location): {
-        println("FAILED: Syntax with errors.myql\nlocation: <location>");
         return false;
     }
     return true;
@@ -154,10 +148,8 @@ test bool testErrors(){
 test bool testTax(){
      try{
         getForm(5);
-        println("PASSED: Syntax with tax.myql");
     }
     catch ParseError(location):{
-        println("FAILED: Syntax with tax.myql\nlocation: <location>");
         return false;
     }
     return true;

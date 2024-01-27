@@ -1,12 +1,26 @@
 module Compile
 
+import util::Webserver;
+extend Content;
 import CST2AST;
+import Syntax;
 import AST;
 import Resolve;
+import Transform;
 import IO;
 import Eval;
 import lang::html::AST; // see standard library
 import lang::html::IO;
+import String;
+import Exception;
+import Check;
+import Message;
+
+loc serverLocation = |http://localhost:10001|;
+map[str, AType] idToTypeMap;
+VEnv currentVenv;
+AForm currentForm;
+bool isInitialized = false;
 
 /*
  * Implement a compiler for QL to HTML and Javascript
@@ -21,55 +35,64 @@ import lang::html::IO;
  * - if needed, use the name analysis to link uses to definitions
  */
 
-void compile(AForm f) {
-  HTMLElement t = text("some text");
-  println("attribute test: <t>");
-  writeFile(f.src[extension="js"].top, form2js(f));
-  writeFile(f.src[extension="html"].top, writeHTMLString(form2html(f)));
-}
-
 HTMLElement form2html(AForm f) {
-  HTMLElement myForm = form([]);
+  HTMLElement myForm = form([], \method="POST");
   for (q <- f.questions){
-    myForm.elems += question2html(q);
+    if(!(q is ifQuestion)){
+      throw "Expected only if questions in flattened form";
+    }
+    HTMLElement d;
+    switch(q.question){
+      case singleQuestion(str qlabel, AId qid, AType qfinaltype): {
+        str defaultValue = "";
+        if(isInitialized){
+          switch(currentVenv[qid.name]){
+            case vint(n): defaultValue = "<n>";
+            case vbool(b): {
+              switch(b){
+                case true: defaultValue = "on";
+                case false: defaultValue = "off";
+              }
+            }
+            case vstr(s): defaultvalue = s;
+          }
+        }
+        HTMLElement lab = label([text("<qlabel>")]);
+        HTMLElement inp;
+        switch(qfinaltype){
+          case booleanType(): {
+            if(defaultValue == "on"){
+              inp = input(\type = getInputType(qfinaltype), \name = "<qid.name>", \checked = "");
+            } else {
+              inp = input(\type = getInputType(qfinaltype), \name = "<qid.name>");
+            }
+          }
+          default: inp = input(\type = getInputType(qfinaltype), \name = "<qid.name>", \value = defaultValue);
+        }
+        d = div([lab, inp], \id = "<qid.name>");
+      }
+      case computedQuestion(str qlabel, AId qid, AType qfinaltype, AExpr qexpression):{
+        HTMLElement lab = label([text("<qlabel>")], \for = "<qid.name>");
+        HTMLElement val;
+        switch(qfinaltype){
+          case stringType(): val = text("<currentVenv[qid.name].s>");
+          case booleanType(): val = text("<currentVenv[qid.name].b>");
+          case integerType(): val = text("<currentVenv[qid.name].n>");
+        }
+        d = div([lab, val], \id = "<qid.name>");
+      }
+      default: throw "Expected if questions with only single or computed questions in them";
+    }
+    // Check if this question should be displayed
+    if(q.guard == val(Boolean(true))){ // This question is not in an if statement
+      myForm.elems += [d, br()];
+    } else if (isInitialized && eval(q.guard, currentVenv) == vbool(true)){
+      myForm.elems += [d, br()];
+    }
   }
-  HTMLElement myHead = head([script([], \src = "https://cdn.jsdelivr.net/npm/vue@2")]);
+  myForm.elems += [input(\type="submit", \value="Submit")];
   HTMLElement myBody = body([myForm]);
-  return html([myHead, myBody]);
-}
-
-list[HTMLElement] question2html(AQuestion q){
-  switch(q){
-    case singleQuestion(qLabel, qId, finaltype): {
-      HTMLElement lab = label([text("<qLabel>")], \for = "<qId.name>");
-      HTMLElement inp = input(\id = "<qId.name>", \type = getInputType(finaltype));
-      return [lab, inp, br()];
-    }
-    case computedQuestion(qLabel, qId, finaltype, expression): { 
-      HTMLElement lab = label([text("<qLabel>")], \for = "<qId.name>");
-      HTMLElement val = text("value", \id = "<qId.name>");
-      return [lab, val, br()];
-    }
-    case block(questions): return questions2html(questions);
-    case ifElseQuestion(conditionId, ifQuestions, elseQuestions): {
-      HTMLElement ifConditionTrue = section([text("if: <conditionId.name>"), br()] + questions2html(ifQuestions));
-      HTMLElement elseConditionTrue = section([text("else: <conditionId.name>"), br()] + questions2html(elseQuestions));
-      return [ifConditionTrue, elseConditionTrue];
-    }
-    case ifQuestion(conditionId, ifQuestions): {
-      HTMLElement ifConditionTrue = section([text("if: <conditionId.name>"), br()] + questions2html(ifQuestions));
-      return [ifConditionTrue];
-    }
-  }
-  return [];
-}
-
-list[HTMLElement] questions2html(list[AQuestion] qs){
-  list[HTMLElement] questionList = [];
-  for (q <- qs){
-      questionList += question2html(q);
-  }
-  return questionList;
+  return html([myBody]);
 }
 
 str getInputType(AType t){
@@ -80,59 +103,87 @@ str getInputType(AType t){
   }
 }
 
-
-
-str form2js(AForm f) {
-  VEnv venv = initialEnv(f);
-  return "
-  // Import your AST and Eval definitions
-  import { AId, AType, AValue } from \'src/AST.rsc\';
-  import { initialEnv } from \'src/Eval.rsc\'; // Adjust the path accordingly
-
-  // Call the initialEnv function directly to initialize venv
-  const myForm = ...; // Define your form here
-  const initializedVenv = initialEnv(myForm);
-
-  // Define a Vue instance
-  var app = new Vue({
-      el: \'#app\',
-      data: {
-          questions: [
-              // Initialize your questions here with appropriate IDs, labels, and types
-              {
-                  id: new AId({ name: \'question1\' }),
-                  label: \'Question 1\',
-                  finaltype: new AType.stringType(),
-                  value: \'\' // Initial value
-              },
-              // Add more questions as needed
-          ],
-          venv: initializedVenv // Initialize venv directly from Vue
-      },
-      methods: {
-          submitForm: function () {
-              // Process the form submission, update VEnv, and perform other actions
-              for (let question of this.questions) {
-                  // Update VEnv with the input value using the eval function
-                  const inputValue = question.finaltype === \'booleanType\'
-                      ? question.value // For boolean, use the actual value
-                      : new AValue({ value: question.value }); // For other types, wrap it in AValue
-
-                  const input = { question: question.id.name, value: inputValue };
-                  this.venv = eval(this.form, input, this.venv);
-              }
-
-              // You can now send the updated VEnv to your backend or perform other actions
-              console.log(\'Updated VEnv:\', this.venv);
-          }
-      }
-  });
-  ";
+map[str, AType] createTypeMap(AForm f){
+  map[str, AType] result = ();
+  for(q <- f.questions){
+    result += (q.question.id.name:q.question.finaltype);
+  }
+  return result;
 }
 
-void testCompile(){
-  AForm f = getExampleAST();
-  println("result: <form2html(f)>");
-  compile(f);
-  
+void startWebServer() {
+   // simple get
+   Response testServer(r:get("/")) = getResponse(true, r);
+   Response testServer(p:post("/", value (type[value] _) stuff)) = getResponse(false, p);     
+   try {
+      serve(serverLocation, testServer);
+      println("Server started successfully!\n<serverLocation>");
+   }
+   catch value exception:
+     throw "failed to server website: <exception>";
+}
+
+Response getResponse(bool isGet, Request r){
+  loc inputHTMLLocation = |cwd:///examples/input_form.html|;
+  if(isGet){
+    // respond with give ql input
+    return response(resolveLocation(inputHTMLLocation));
+  }
+  if("QLInput" in r.parameters){
+    // respond with their compiled ql
+    try
+      currentForm = flatten(cst2ast(parseFromString(r.parameters["QLInput"])));
+    catch e:
+      return response("There was an error while handling your input:\n<e>");
+    set[Message] errorsOrWarnings = check(currentForm);
+    str totalErrorsOrWarnings = "";
+    for(msg <- errorsOrWarnings){
+      switch(msg){
+        case error(str errorMessage): totalErrorsOrWarnings = "<totalErrorsOrWarnings>\<br\>ERROR:<errorMessage>";
+        case warning(str warningMessage): totalErrorsOrWarnings = "<totalErrorsOrWarnings>\<br\>WARNING:<warningMessage>";
+      }
+    }
+    if (totalErrorsOrWarnings != ""){
+      return response(totalErrorsOrWarnings);
+    }
+    currentVenv = initialEnv(currentForm);
+    idToTypeMap = createTypeMap(currentForm);
+    isInitialized = true;
+    return response(writeHTMLString(form2html(currentForm)));
+  }
+  // respond with their compiled and re-evaluated ql
+  for(str key <- r.parameters){
+    if(key in currentVenv){
+      Value v;
+      switch(idToTypeMap[key]){
+        case stringType(): v = vstr(r.parameters[key]);
+        case booleanType(): {
+          switch("<r.parameters[key]>"){
+            case "on": v = vbool(true);
+            case "off": v = vbool(false);
+            default: throw "booleanType result undefined: <r.parameters[key]>";
+          }
+        }
+        case integerType(): v = vint(toInt(r.parameters[key]));
+        default: throw "no type for <key> with type <idToTypeMap[key]>";
+      }
+      println("new input: <key> <v>");
+      currentVenv = eval(currentForm, input(key, v), currentVenv);
+    }
+  }
+  for(str key <- currentVenv){
+    switch(currentVenv[key]){
+      case vbool(b): { // when checkboxes are not included in a form submission, it means they are unchecked
+        if (!(key in r.parameters)){
+          println("new input: <key> <vbool(false)>");
+          currentVenv = eval(currentForm, input(key, vbool(false)), currentVenv);
+        }
+      }
+    }
+  }
+  return response(writeHTMLString(form2html(currentForm)));
+}
+
+void shutDownServer(){
+  shutdown(serverLocation);
 }

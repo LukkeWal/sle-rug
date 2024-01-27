@@ -2,6 +2,8 @@ module Eval
 
 import AST;
 import Resolve;
+import CST2AST;
+import IO;
 
 /*
  * Implement big-step semantics for QL
@@ -63,25 +65,38 @@ VEnv eval(AQuestion q, Input inp, VEnv venv) {
   // evaluate conditions for branching,
   // evaluate inp and computed questions to return updated VEnv
   switch(q){
-    case singleQuestion(label, id, finaltype): {
+    case singleQuestion(_, id, _): {
       // Update the environment with the input value
-      switch(inp){
-        case input(q, v): {
-          if (q.id.name == id.name) {
-            venv[id.name] = v;
-          };
-        }
+      if(inp.question == id.name){
+        venv[id.name] = inp.\value;
       }
     }
-    case computedQuestion(label, id, finaltype, expression): venv[id.name] = eval(expression, venv);
+    case computedQuestion(_, id, _, expression): venv[id.name] = eval(expression, venv);
+    case block(questions):{
+      for(question <- questions){
+        venv = eval(question, inp, venv);
+      }
+    }
+    case ifElseQuestion(guard, ifQuestion, elseQuestion): {
+      venv = eval(ifQuestion, inp, venv);
+      venv = eval(elseQuestion, inp, venv);
+    }
+    case ifQuestion(guard, ifQuestion): venv = eval(ifQuestion, inp, venv);
   }
-  return (); 
+  return venv; 
 }
 
 Value eval(AExpr e, VEnv venv) {
   switch (e) {
     case ref(id(str x)): return venv[x];
-    case computationExpr(AExpr a, str operator, AExpr b): {
+    case negation(str negator, AExpr a): {
+      switch(negator){
+        case "!": return vbool(!eval(a, venv).b);
+        case "-": return vint(-1 * eval(a, venv).n);
+        default: throw "unknown negator: <negator>";
+      }
+    }
+    case computation(AExpr a, str operator, AExpr b): {
       switch (operator){
         case "*": return vint(eval(a, venv).n * eval(b, venv).n);
         case "/": return vint(eval(a, venv).n / eval(b, venv).n);
@@ -93,17 +108,36 @@ Value eval(AExpr e, VEnv venv) {
         case "\<=": return vbool(eval(a, venv).b <= eval(b, venv).b);
         case "\>=": return vbool(eval(a, venv).b >= eval(b, venv).b);
         case "==": return vbool(eval(a, venv) == eval(b, venv));
-        case "\>": return vbool(eval(a, venv).b > eval(b, venv).b);
-        case "\<": return vbool(eval(a, venv).b < eval(b, venv).b);
-        default: return vbool(eval(a, venv).b != eval(b, venv).b); // not sure how ! is supposed to work so made it !=
+        case "\>": return vbool(eval(a, venv).n > eval(b, venv).n);
+        case "\<": return vbool(eval(a, venv).n < eval(b, venv).n);
+        default: throw "unknown operator: <operator>";
       }
     }
     case val(AValue v): 
     switch(v) {
-      case String(): return vstr("");
-      case Boolean(): return vbool(false);
-      default: return vint(0);
+      case String(s): return vstr(s);
+      case Boolean(b): return vbool(b);
+      case Integer(i): return vint(i);
+      default: throw "unimplemented AValue: <v>";
     }
+    case parenthesis(AExpr a): return eval(a, venv);
     default: throw "Unsupported expression <e>";
   }
+}
+
+test bool testTax(){
+  AForm f = getAST(5);
+  VEnv venv = initialEnv(f);
+  list[Input] allInput = [input("hasBoughtHouse", vbool(true)),
+                          input("hasMaintLoan", vbool(true)),
+                          input("hasSoldHouse", vbool(true)),
+                          input("sellingPrice", vint(1000)),
+                          input("privateDebt", vint(250))];
+  for(input <- allInput){
+    venv = eval(f, input, venv);
+  }
+  if(venv["valueResidue"] == vint(750)){
+    return true;
+  }
+  return false;
 }

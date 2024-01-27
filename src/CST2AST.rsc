@@ -73,24 +73,15 @@ AId cst2ast(Id i){
   return id("<i>", src=i.src);
 }
 
-AForm getExampleAST(){
-  start[Form] exampleForm = example();
-  return cst2ast(exampleForm);
-}
-
-void testImplementation(){
-  start[Form] exampleForm = example();
-  AForm result = cst2ast(exampleForm);
-  println("result:\n<result>");
+AForm getAST(int number){
+  return cst2ast(getForm(number));
 }
 
 test bool testBinary(){
     try{
-        cst2ast(getForm(1));
-        println("PASSED: CST2AST with binary.myql");
+        getAST(1);
     }
     catch ParseError(location):{
-        println("FAILED: CST2AST with binary.myql\nlocation: <location>");
         return false;
     }
     return true;
@@ -98,11 +89,9 @@ test bool testBinary(){
 
 test bool testCyclic(){
     try{
-        cst2ast(getForm(2));
-        println("PASSED: CST2AST with cyclic.myql");
+        getAST(2);
     }
     catch ParseError(location): {
-        println("FAILED: CST2AST with cyclic.myql\nlocation: <location>");
         return false;
     }
     return true;
@@ -110,11 +99,9 @@ test bool testCyclic(){
 
 test bool testEmpty(){
     try{
-        cst2ast(getForm(3));
-        println("PASSED: CST2AST with empty.myql");
+        getAST(3);
     }
     catch ParseError(location):{
-        println("FAILED: CST2AST with empty.myql\nlocation: <location>");
         return false;
     }
     return true;
@@ -122,11 +109,9 @@ test bool testEmpty(){
 
 test bool testErrors(){
     try{
-        cst2ast(getForm(4));
-        println("PASSED: CST2AST with errors.myql");
+        getAST(4);
     }
     catch ParseError(location): {
-        println("FAILED: CST2AST with errors.myql\nlocation: <location>");
         return false;
     }
     return true;
@@ -134,11 +119,9 @@ test bool testErrors(){
 
 test bool testTax(){
      try{
-        cst2ast(getForm(5));
-        println("PASSED: CST2AST with tax.myql");
+        getAST(5);
     }
     catch ParseError(location):{
-        println("FAILED: CST2AST with tax.myql\nlocation: <location>");
         return false;
     }
     return true;
