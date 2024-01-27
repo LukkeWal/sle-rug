@@ -2,6 +2,7 @@ module Resolve
 import IO;
 import Syntax;
 import CST2AST;
+import Transform;
 
 import AST;
 
@@ -100,6 +101,12 @@ bool checkRefGraph(RefGraph r, list[str] correctUse, list[str] correctDef){
   return true;
 }
 
+test bool testResolveBinary(){
+  println("testing resovle on binary");
+  AForm f = flatten(getAST(1));
+  RefGraph r = resolve(f);
+  return true;
+}
 
 test bool testError(){
   AForm f = getAST(4);

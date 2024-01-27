@@ -131,19 +131,25 @@ Response getResponse(bool isGet, Request r){
   }
   if("QLInput" in r.parameters){
     // respond with their compiled ql
-    try
+    try {
       currentForm = flatten(cst2ast(parseFromString(r.parameters["QLInput"])));
+      //currentForm = flatten(getAST(1));
+    }
     catch e:
       return response("There was an error while handling your input:\n<e>");
     set[Message] errorsOrWarnings = check(currentForm);
     str totalErrorsOrWarnings = "";
+    int totalErrors = 0;
     for(msg <- errorsOrWarnings){
       switch(msg){
-        case error(str errorMessage): totalErrorsOrWarnings = "<totalErrorsOrWarnings>\<br\>ERROR:<errorMessage>";
-        case warning(str warningMessage): totalErrorsOrWarnings = "<totalErrorsOrWarnings>\<br\>WARNING:<warningMessage>";
+        case error(str errorMessage): {
+          totalErrors += 1;
+          totalErrorsOrWarnings = "<totalErrorsOrWarnings>\<br\>ERROR:<errorMessage>";
+        }
+        case warning(warningMessage, _): totalErrorsOrWarnings = "<totalErrorsOrWarnings>\<br\>WARNING:<warningMessage>";
       }
     }
-    if (totalErrorsOrWarnings != ""){
+    if (totalErrors > 0){
       return response(totalErrorsOrWarnings);
     }
     currentVenv = initialEnv(currentForm);

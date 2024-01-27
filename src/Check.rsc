@@ -40,13 +40,16 @@ Type ATypeToType(AType t){
 }
 
 set[Message] check(AForm f){
-  return check(f, collect(f), resolve(f).useDef);
+  RefGraph refGraph = resolve(f);
+  TEnv tenv = collect(f);
+  set[Message] result = check(f, tenv, refGraph.useDef);
+  return result;
 }
 
 // - produce an error if there are used names that do not have a definition
 set[Message] check(AForm f, TEnv tenv, UseDef useDef) {
   set[Message] result = {};
-  result += checkForCycles(f, useDef);
+  result += checkForCycles(f);
   for(question <- f.questions){
     result += check(question, tenv, useDef);
   }
@@ -78,17 +81,19 @@ set[Message] check(AQuestion q, TEnv tenv, UseDef useDef) {
       }
     }
   };
-
   // Check any other questions or expressions inside this question
   switch(q){
-  case computedQuestion(_, _, _, AExpr expression): result += check(expression, tenv, useDef);
-  case block(list[AQuestion] questions): {
-    for(question <- questions){
+    case computedQuestion(_, _, _, AExpr expression): result += check(expression, tenv, useDef);
+    case block(list[AQuestion] questions): {
+      for(question <- questions){
+        result += check(question, tenv, useDef);
+      }
+    }
+    case ifElseQuestion(AExpr guard, AQuestion ifQuestion, AQuestion elseQuestion): result += check(guard, tenv, useDef) + check(ifQuestion, tenv, useDef) + check(elseQuestion, tenv, useDef);
+    case ifQuestion(AExpr guard, AQuestion question): {
+      result += check(guard, tenv, useDef);
       result += check(question, tenv, useDef);
     }
-  }
-  case ifElseQuestion(AExpr guard, AQuestion ifQuestion, AQuestion elseQuestion): result += check(guard, tenv, useDef) + check(ifQuestion, tenv, useDef) + check(elseQuestion, tenv, useDef);
-  case ifQuestion(AExpr guard, AQuestion question): result += check(guard, tenv, useDef) + check(question, tenv, useDef);
   }
   return result; 
 }
@@ -103,7 +108,7 @@ set[Message] check(AExpr e, TEnv tenv, UseDef useDef) {
       msgs += { error("Undeclared question", x.src) | useDef[x.src] == {} };
     }
     case negation(str neg, AExpr a): {
-      type ExpectedType;
+      Type expectedType;
       switch(neg){
         case "!": expectedType = tbool();
         case "-": expectedType = tint();
@@ -220,7 +225,7 @@ list[str] getUsesFromAExpr(AExpr a){
   return result;
 }
 
-set[Message] checkForCycles(AForm f, UseDef useDef){
+set[Message] checkForCycles(AForm f){
   set[Message] result = {};
   User user = closeUserRelation(f);
   for (u <- user){
@@ -231,10 +236,25 @@ set[Message] checkForCycles(AForm f, UseDef useDef){
   return result;
 }
 
+test bool testCheckBinary(){
+  AForm f = getAST(1);
+  TEnv tenv = collect(f);
+  UseDef useDef = resolve(f).useDef;
+  set[Message] result = check(f, tenv, useDef);
+  for(msg <- result){
+    switch(msg){
+      case error(errorMsg): {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 test bool testCyclic(){
   AForm f = getAST(2);
   UseDef useDef = resolve(f).useDef;
-  set[Message] messages = checkForCycles(f, useDef);
+  set[Message] messages = checkForCycles(f);
   if(size(messages)== 4){
     return true;
   }

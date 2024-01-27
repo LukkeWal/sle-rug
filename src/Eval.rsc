@@ -141,3 +141,19 @@ test bool testTax(){
   }
   return false;
 }
+
+test bool testBinary(){
+  AForm f = getAST(1);
+  VEnv venv = initialEnv(f);
+  list[Input] allInput = [input("x_1_10", vbool(true)),
+                          input("x_1_5", vbool(true)),
+                          input("x_1_3", vbool(true)),
+                          input("x_1_2", vbool(true))];
+  for(input <- allInput){
+    venv = eval(f, input, venv);
+  }
+  if(venv["answer_1_2"] == vint(1)){
+    return true;
+  }
+  return false;
+}
